@@ -73,4 +73,7 @@ TrelloPowerUp.initialize({
       height: 480
     });
   }
+}, {
+  appKey: 'f5089339fa1b492c9a45601594a6982c',
+  appName: 'Scadenze'
 });
