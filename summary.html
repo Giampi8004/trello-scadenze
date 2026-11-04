@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="https://p.trellocdn.com/power-up.min.css">
+  <script src="https://p.trellocdn.com/power-up.min.js"></script>
+  <style>
+    body { padding: 0 16px 16px; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: #172b4d; }
+    .filtri { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 12px; }
+    .filtri button { margin: 0; }
+    .filtri button.attivo { background: #0c66e4; color: #fff; }
+    .stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+    .stat { flex: 1; min-width: 90px; padding: 8px 10px; border-radius: 6px; background: #f1f2f4; cursor: pointer; }
+    .stat b { display: block; font-size: 20px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; color: #5e6c84; font-weight: 600; padding: 6px 4px; border-bottom: 2px solid #dfe1e6; }
+    td { padding: 8px 4px; border-bottom: 1px solid #ebecf0; vertical-align: middle; }
+    tr.riga { cursor: pointer; }
+    tr.riga:hover { background: #f4f5f7; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .red { background: #ffd5d2; color: #ae2e24; }
+    .yellow { background: #f8e6a0; color: #7f5f01; }
+    .green { background: #baf3db; color: #216e4e; }
+    .grey { background: #dcdfe4; color: #44546f; }
+    .vuoto { color: #5e6c84; padding: 24px 0; text-align: center; }
+    .lista { color: #5e6c84; font-size: 12px; }
+    .ck { white-space: nowrap; font-size: 12px; color: #44546f; }
+    .bar { display: inline-block; width: 48px; height: 6px; background: #dcdfe4; border-radius: 3px; margin-left: 6px; vertical-align: middle; overflow: hidden; }
+    .bar i { display: block; height: 100%; background: #1f845a; }
+  </style>
+</head>
+<body>
+  <div class="stats" id="stats"></div>
+  <div class="filtri" id="filtri">
+    <button data-f="aperte" class="attivo">Da fare</button>
+    <button data-f="scaduta">Scadute</button>
+    <button data-f="urgente">Urgenti</button>
+    <button data-f="senzadata">Senza data</button>
+    <button data-f="tutte">Tutte</button>
+  </div>
+  <table>
+    <thead><tr><th>Scheda</th><th>Lista</th><th>Checklist</th><th>Data</th><th>Stato</th></tr></thead>
+    <tbody id="righe"></tbody>
+  </table>
+
+  <script src="./js/common.js"></script>
+  <script src="./js/summary.js"></script>
+</body>
+</html>
