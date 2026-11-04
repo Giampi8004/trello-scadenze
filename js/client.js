@@ -52,6 +52,16 @@ TrelloPowerUp.initialize({
           height: 640
         });
       }
+    }, {
+      icon: { dark: ICON_URL, light: ICON_URL },
+      text: 'Produzione',
+      callback: function (t) {
+        return t.modal({
+          title: 'Timeline commesse in produzione',
+          url: './timeline.html',
+          fullscreen: true
+        });
+      }
     }];
   },
 
