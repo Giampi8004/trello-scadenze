@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="https://p.trellocdn.com/power-up.min.css">
+  <script src="https://p.trellocdn.com/power-up.min.js"></script>
+  <style>
+    body { padding: 8px 12px; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+    h4 { margin: 10px 0 4px; }
+    label { display: block; margin-top: 6px; font-weight: 600; }
+    input[type=number] { width: 100%; }
+    .hint { color: #5e6c84; font-size: 12px; margin: 2px 0 8px; }
+    .err { color: #c9372c; font-size: 12px; min-height: 16px; }
+    .liste label { font-weight: 400; display: flex; gap: 6px; align-items: center; margin: 3px 0; font-size: 13px; }
+    .liste input { margin: 0; }
+  </style>
+</head>
+<body>
+  <form id="f">
+    <h4>Soglie colori</h4>
+    <label for="rosso">Rosso entro (giorni)</label>
+    <input id="rosso" type="number" min="0" max="365" required>
+    <label for="giallo">Giallo entro (giorni)</label>
+    <input id="giallo" type="number" min="0" max="365" required>
+    <p class="hint">Oltre la soglia gialla il badge è verde. Le scadenze passate sono sempre rosse.</p>
+
+    <h4>Liste finali</h4>
+    <p class="hint">Le schede in queste liste non hanno badge e non compaiono tra scadute o senza data.</p>
+    <div class="liste" id="liste"></div>
+
+    <div class="err" id="err"></div>
+    <button type="submit" class="mod-primary">Salva</button>
+  </form>
+
+  <script src="./js/common.js"></script>
+  <script>
+    var t = TrelloPowerUp.iframe();
+    var rosso = document.getElementById('rosso');
+    var giallo = document.getElementById('giallo');
+    var boxListe = document.getElementById('liste');
+
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+
+    t.render(function () {
+      return Promise.all([leggiSoglie(t), leggiListeEscluse(t), t.lists('id', 'name')]).then(function (r) {
+        rosso.value = r[0].rosso;
+        giallo.value = r[0].giallo;
+        boxListe.innerHTML = r[2].map(function (l) {
+          var on = listaEsclusa(l, r[1]) ? ' checked' : '';
+          return '<label><input type="checkbox" value="' + l.id + '"' + on + '>' + esc(l.name) + '</label>';
+        }).join('');
+        t.sizeTo('#f');
+      });
+    });
+
+    document.getElementById('f').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var r = parseInt(rosso.value, 10), g = parseInt(giallo.value, 10);
+      if (g < r) {
+        document.getElementById('err').textContent = 'La soglia gialla deve essere ≥ di quella rossa.';
+        return;
+      }
+      var escluse = Array.prototype.map.call(
+        boxListe.querySelectorAll('input:checked'), function (i) { return i.value; });
+      t.set('board', 'shared', { soglie: { rosso: r, giallo: g }, listeEscluse: escluse }).then(function () {
+        t.closePopup();
+      });
+    });
+  </script>
+</body>
+</html>
