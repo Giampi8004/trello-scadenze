@@ -30,7 +30,7 @@ function disegna() {
   var sel = carte.filter(function (c) { return c.idList === listaSel; });
   var conData = sel.filter(function (c) { return c.due; })
     .map(function (c) { c.g = giorniMancanti(c.due); return c; })
-    .sort(function (a, b) { return a.g - b.g; });
+    .sort(function (a, b) { return b.g - a.g; });   // da sinistra a destra
   var senza = sel.filter(function (c) { return !c.due; });
 
   document.getElementById('nodata').innerHTML = senza.length
@@ -53,7 +53,7 @@ function disegna() {
   var pxG = Math.max((largh - BOX_W) / (2 * maxG), 6);
   var W = Math.round(2 * maxG * pxG + BOX_W);
   var x0 = W / 2;
-  function xDi(g) { return x0 + g * pxG; }
+  function xDi(g) { return x0 - g * pxG; }   // specchiata: in corso a sinistra, in ritardo a destra
 
   // Righe: ogni casella va nella prima riga libera
   var righe = [];
