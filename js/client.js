@@ -54,10 +54,10 @@ TrelloPowerUp.initialize({
       }
     }, {
       icon: { dark: ICON_URL, light: ICON_URL },
-      text: 'Produzione',
+      text: 'Deadline',
       callback: function (t) {
         return t.modal({
-          title: 'Timeline commesse in produzione',
+          title: 'Deadline',
           url: './timeline.html',
           fullscreen: true
         });
