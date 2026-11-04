@@ -1,7 +1,10 @@
-/* Timeline commesse: asse centrale = oggi */
-var t = TrelloPowerUp.iframe();
+/* Deadline: timeline commesse (in corso a sinistra, in ritardo a destra) + materiale da checklist "Materiale fornitori" */
+var APP_KEY = 'f5089339fa1b492c9a45601594a6982c';
+var CHECKLIST_MAT = 'Materiale fornitori';
+var t = TrelloPowerUp.iframe({ appKey: APP_KEY, appName: 'Scadenze' });
+var materiale = null;   // null = non autorizzato/non caricato; {} = mappa idScheda -> checklist
 var carte = [], liste = [], listaSel = null;
-var BOX_W = 180, BOX_H = 58, GAP = 8, TOP = 30;
+var BOX_W = 200, BOX_H = 78, GAP = 8, TOP = 30;
 
 function esc(s) {
   return String(s).replace(/[&<>"']/g, function (c) {
@@ -24,12 +27,66 @@ function etichetta(g, completa) {
   return 'Tra ' + g + ' g';
 }
 
+function parseData(s) {
+  var m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(s || '');
+  return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
+}
+
+function calcolaMateriale(c) {
+  if (!materiale) return undefined;
+  var cl = materiale[c.id];
+  if (!cl) return null;
+  var oggi = new Date(); oggi.setHours(0, 0, 0, 0);
+  var due = c.due ? new Date(c.due) : null; if (due) due.setHours(0, 0, 0, 0);
+  var m = { arrivati: 0, totale: 0, voci: 0, vociFatte: 0, mancanti: [], ritardo: false, inRitardo: 0, ultimo: '' }, ultimo = null;
+  cl.checkItems.forEach(function (it) {
+    m.voci++; if (it.state === 'complete') m.vociFatte++;
+    var gruppo = /^(\d+) pezzi già a magazzino/.exec(it.name);   // voce riassuntiva
+    var n = gruppo ? +gruppo[1] : 1;
+    m.totale += n;
+    if (it.state === 'complete') { m.arrivati += n; return; }
+    var parti = it.name.replace(/\s*\[[^\]]*\]\s*$/, '').split(' – ');
+    var ordine = (/\[([^\]]+)\]\s*$/.exec(it.name) || [])[1] || '';
+    var arr = parseData(it.name), motivo = '';
+    if (arr && arr < oggi) motivo = 'doveva arrivare';
+    else if (arr && due && arr > due) motivo = 'dopo la scadenza';
+    if (motivo) { m.ritardo = true; m.inRitardo++; }
+    if (arr && (!ultimo || arr > ultimo)) ultimo = arr;
+    m.mancanti.push([parti[0] || it.name, parti[1] || '', (parti[2] || '').replace(/^arrivo.*/, ''),
+                     arr ? arr.toLocaleDateString('it-IT') : 'non indicato', motivo, ordine]);
+  });
+  m.ultimo = ultimo ? ultimo.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }) : '';
+  return m;
+}
+
+function rigaMateriale(c) {
+  var m = c.mat;
+  if (m === undefined) return '';
+  if (!m) return '<div class="mat mat-nd">&#128230; nessun dato materiale</div>';
+  if (m.arrivati === m.totale) return '<div class="mat mat-ok">&#128230; ' + m.arrivati + '/' + m.totale + ' &middot; tutto a magazzino</div>';
+  var cls = m.ritardo ? 'mat-ko' : 'mat-wait';
+  var txt = m.ritardo ? '&#9888; ' + m.inRitardo + ' in ritardo' : (m.ultimo ? 'ultimo arrivo ' + m.ultimo : 'in arrivo');
+  return '<div class="mat ' + cls + '">&#128230; ' + m.arrivati + '/' + m.totale + ' &middot; ' + txt + '</div>';
+}
+
+function dettaglio(c) {
+  var m = c.mat, h = '<h4>' + esc(c.name) + ' <button class="apri" data-apri="' + c.id + '">Apri scheda</button></h4>';
+  if (m === undefined) return h + '<p>Autorizza la lettura del materiale (pulsante in alto) per vedere il dettaglio.</p>';
+  if (!m) return h + '<p>Nessuna checklist "' + CHECKLIST_MAT + '" su questa scheda.</p>';
+  if (!m.mancanti.length) return h + '<p>Tutto il materiale (' + m.totale + ' pezzi) risulta a magazzino.</p>';
+  h += '<p>Materiale arrivato <b>' + m.arrivati + ' su ' + m.totale + '</b> &middot; scadenza commessa ' + formattaData(c.due) + '</p><table><tr><th>Pezzo</th><th>Fornitore</th><th>Stato</th><th>Arrivo</th><th></th><th>Ordine</th></tr>';
+  m.mancanti.forEach(function (x) {
+    h += '<tr' + (x[4] ? ' class="rit"' : '') + '><td>' + esc(x[0]) + '</td><td>' + esc(x[1]) + '</td><td>' + x[2] + '</td><td>' + x[3] + '</td><td>' + (x[4] || '') + '</td><td>' + esc(x[5]) + '</td></tr>';
+  });
+  return h + '</table>';
+}
+
 function disegna() {
   var area = document.getElementById('area');
   var wrap = document.getElementById('wrap');
   var sel = carte.filter(function (c) { return c.idList === listaSel; });
   var conData = sel.filter(function (c) { return c.due; })
-    .map(function (c) { c.g = giorniMancanti(c.due); return c; })
+    .map(function (c) { c.g = giorniMancanti(c.due); c.mat = calcolaMateriale(c); return c; })
     .sort(function (a, b) { return b.g - a.g; });   // da sinistra a destra
   var senza = sel.filter(function (c) { return !c.due; });
 
@@ -81,11 +138,12 @@ function disegna() {
     var col = colore(c.g, c.dueComplete);
     var top = TOP + c.riga * (BOX_H + GAP);
     var b = c.badges || {};
-    var ck = b.checkItems ? ' · ☑ ' + b.checkItemsChecked + '/' + b.checkItems : '';
+    var tot = (b.checkItems || 0) - (c.mat ? c.mat.voci : 0), fatti = (b.checkItemsChecked || 0) - (c.mat ? c.mat.vociFatte : 0);
+    var ck = tot > 0 ? ' · ☑ ' + fatti + '/' + tot : '';
     html += '<div class="pin ' + col + '" style="left:' + xDi(c.g) + 'px;top:' + (TOP - 6) + 'px;height:' + (top - TOP + 6) + 'px"></div>';
-    html += '<div class="box ' + col + '" data-id="' + c.id + '" title="' + esc(c.name) + '" style="left:' + c.left + 'px;top:' + top + 'px">' +
+    html += '<div class="box ' + col + (c.mat && c.mat.ritardo ? ' alert' : '') + '" data-id="' + c.id + '" title="' + esc(c.name) + '" style="left:' + c.left + 'px;top:' + top + 'px">' +
       '<b>' + esc(c.name) + '</b>' + formattaData(c.due) + '<br>' +
-      '<strong>' + etichetta(c.g, c.dueComplete) + '</strong><span class="ck">' + ck + '</span></div>';
+      '<strong>' + etichetta(c.g, c.dueComplete) + '</strong><span class="ck">' + ck + '</span>' + rigaMateriale(c) + '</div>';
   });
 
   area.style.width = W + 'px';
@@ -95,9 +153,44 @@ function disegna() {
 }
 
 document.body.addEventListener('click', function (e) {
+  var ap = e.target.closest('[data-apri]');
+  if (ap) { t.showCard(ap.getAttribute('data-apri')); return; }
+  if (e.target.closest('#autorizza')) { autorizza(); return; }
+  var box = e.target.closest('.box[data-id]');
+  if (box) {
+    var c = carte.filter(function (x) { return x.id === box.getAttribute('data-id'); })[0];
+    Array.prototype.forEach.call(document.querySelectorAll('.box'), function (b) { b.classList.toggle('sel', b === box); });
+    document.getElementById('det').innerHTML = dettaglio(c);
+    return;
+  }
   var el = e.target.closest('[data-id]');
   if (el) t.showCard(el.getAttribute('data-id'));
 });
+
+function caricaMateriale() {
+  var api = t.getRestApi();
+  return api.isAuthorized().then(function (ok) {
+    document.getElementById('auth').style.display = ok ? 'none' : '';
+    if (!ok) { materiale = null; return; }
+    return Promise.all([api.getToken(), t.board('id')]).then(function (r) {
+      return fetch('https://api.trello.com/1/boards/' + r[1].id + '/cards?fields=id&checklists=all&checklist_fields=name&key=' + APP_KEY + '&token=' + r[0])
+        .then(function (x) { return x.json(); })
+        .then(function (cards) {
+          materiale = {};
+          cards.forEach(function (cd) {
+            var cl = (cd.checklists || []).filter(function (k) { return k.name === CHECKLIST_MAT; })[0];
+            if (cl) materiale[cd.id] = cl;
+          });
+        });
+    });
+  }).catch(function () { materiale = null; });
+}
+
+function autorizza() {
+  t.getRestApi().authorize({ scope: 'read', expiration: 'never' })
+    .then(function () { return caricaMateriale(); })
+    .then(function () { disegna(); });
+}
 
 document.getElementById('lista').addEventListener('change', function () {
   listaSel = this.value;
@@ -120,6 +213,6 @@ t.render(function () {
     document.getElementById('lista').innerHTML = liste.map(function (l) {
       return '<option value="' + l.id + '"' + (l.id === listaSel ? ' selected' : '') + '>' + esc(l.name) + '</option>';
     }).join('');
-    disegna();
-  });
+    return caricaMateriale();
+  }).then(function () { disegna(); });
 });
