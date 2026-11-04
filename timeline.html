@@ -29,6 +29,16 @@
     .grigio { background: #dcdfe4; color: #44546f; } .pin.grigio { background: #8590a2; }
     .nodata { margin-top: 12px; font-size: 13px; }
     .nodata span { display: inline-block; margin: 4px 6px 0 0; padding: 4px 8px; background: #dcdfe4; border-radius: 4px; cursor: pointer; }
+    .mat { margin-top: 3px; padding-top: 3px; border-top: 1px solid rgba(0,0,0,.12); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mat-ok { color: #216e4e; } .mat-wait { color: #7f5f01; } .mat-ko { color: #ae2e24; } .mat-nd { color: #626f86; font-weight: 400; }
+    .box.alert { outline: 2px solid #e34935; outline-offset: -2px; }
+    .box.sel { box-shadow: 0 0 0 3px #0c66e4; }
+    #det { margin-top: 12px; background: #fff; border: 1px solid #dcdfe4; border-radius: 8px; padding: 10px 14px; font-size: 13px; }
+    #det h4 { margin: 0 0 4px; } #det p { margin: 0 0 8px; color: #44546f; }
+    #det table { border-collapse: collapse; width: 100%; } #det th, #det td { text-align: left; padding: 4px 6px; border-bottom: 1px solid #ebecf0; }
+    #det tr.rit td { color: #ae2e24; font-weight: 600; }
+    #auth { margin: 0 0 10px; padding: 8px 12px; background: #e9f2ff; border-radius: 6px; font-size: 13px; }
+    #auth button, .apri { margin: 0 0 0 8px; padding: 2px 10px; font-size: 12px; }
     .vuoto { padding: 40px; text-align: center; color: #5e6c84; }
   </style>
 </head>
@@ -42,10 +52,12 @@
       <span><i class="viola"></i>Scadute da più di 10 giorni</span>
     </div>
   </div>
+  <div id="auth" style="display:none">&#128230; Per vedere il materiale da Ready Web serve autorizzare (una volta sola) la lettura delle checklist. <button id="autorizza">Autorizza</button></div>
   <div id="wrap"><div id="area"></div></div>
+  <div id="det"><i>Clicca una commessa per vedere il dettaglio del materiale.</i></div>
   <div class="nodata" id="nodata"></div>
 
-  <script src="./js/common.js?v=3"></script>
-  <script src="./js/timeline.js?v=3"></script>
+  <script src="./js/common.js?v=4"></script>
+  <script src="./js/timeline.js?v=4"></script>
 </body>
 </html>
