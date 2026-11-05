@@ -1,16 +1,28 @@
-/* Deadline: timeline commesse (in corso a sinistra, in ritardo a destra) + materiale da checklist "Materiale fornitori" */
+/* Deadline: una commessa per riga, barra dalla presa in carico (data di inizio) alla scadenza.
+   Passato a sinistra, futuro a destra, linea verticale = oggi.
+   In ritardo: la barra prosegue oltre la scadenza fino a oggi (rosso fino a 10 g, viola oltre).
+   Materiale dalla checklist "Materiale fornitori" (aggiornata dal server da Ready Web). */
 var APP_KEY = 'f5089339fa1b492c9a45601594a6982c';
 var CHECKLIST_MAT = 'Materiale fornitori';
 var t = TrelloPowerUp.iframe({ appKey: APP_KEY, appName: 'Scadenze' });
 var materiale = null;   // null = non autorizzato/non caricato; {} = mappa idScheda -> checklist
 var carte = [], liste = [], listaSel = null;
-var BOX_W = 200, BOX_H = 78, GAP = 8, TOP = 30;
+var LAB_W = 280, ROW_H = 58, TOP = 30, GIORNO = 86400000;
 
 function esc(s) {
   return String(s).replace(/[&<>"']/g, function (c) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
   });
 }
+// codice impianto dal nome della scheda: "1738-P Filva SRL" -> "1738-P"
+function codice(nome) {
+  var m = /^\s*(\d{3,5})\s*[-\/ ]?\s*([A-Za-z])\b/.exec(nome || '');
+  return m ? m[1] + '-' + m[2].toUpperCase() : String(nome || '').split(/\s+/)[0];
+}
+function oggi0() { var d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+function giorno0(x) { var d = new Date(x); d.setHours(0, 0, 0, 0); return d; }
+function gm(d) { return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }); }
+function gma(d) { return d.toLocaleDateString('it-IT'); }
 
 function colore(g, completa) {
   if (completa) return 'grigio';
@@ -23,8 +35,8 @@ function colore(g, completa) {
 function etichetta(g, completa) {
   if (completa) return 'Completata';
   if (g === 0) return 'Scade oggi';
-  if (g < 0) return 'Scaduta da ' + (-g) + ' g';
-  return 'Tra ' + g + ' g';
+  if (g < 0) return 'In ritardo di ' + (-g) + ' g';
+  return 'Mancano ' + g + ' g';
 }
 
 function parseData(s) {
@@ -36,9 +48,9 @@ function calcolaMateriale(c) {
   if (!materiale) return undefined;
   var cl = materiale[c.id];
   if (!cl) return null;
-  var oggi = new Date(); oggi.setHours(0, 0, 0, 0);
-  var due = c.due ? new Date(c.due) : null; if (due) due.setHours(0, 0, 0, 0);
-  var m = { arrivati: 0, totale: 0, voci: 0, vociFatte: 0, mancanti: [], ritardo: false, inRitardo: 0, ultimo: '' }, ultimo = null;
+  var oggi = oggi0();
+  var due = c.due ? giorno0(c.due) : null;
+  var m = { arrivati: 0, totale: 0, voci: 0, vociFatte: 0, mancanti: [], ritardo: false, inRitardo: 0, ultimo: '', ultimoD: null }, ultimo = null;
   cl.checkItems.forEach(function (it) {
     m.voci++; if (it.state === 'complete') m.vociFatte++;
     var gruppo = /^(\d+) pezzi già a magazzino/.exec(it.name);   // voce riassuntiva
@@ -53,25 +65,25 @@ function calcolaMateriale(c) {
     if (motivo) { m.ritardo = true; m.inRitardo++; }
     if (arr && (!ultimo || arr > ultimo)) ultimo = arr;
     m.mancanti.push([parti[0] || it.name, parti[1] || '', (parti[2] || '').replace(/^arrivo.*/, ''),
-                     arr ? arr.toLocaleDateString('it-IT') : 'non indicato', motivo, ordine]);
+                     arr ? gma(arr) : 'non indicato', motivo, ordine]);
   });
-  m.ultimo = ultimo ? ultimo.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }) : '';
+  m.ultimoD = ultimo;
+  m.ultimo = ultimo ? gm(ultimo) : '';
   return m;
 }
 
-function rigaMateriale(c) {
-  var m = c.mat;
+function testoMateriale(m) {
   if (m === undefined) return '';
-  if (!m) return '<div class="mat mat-nd">&#128230; nessun dato materiale</div>';
-  if (m.arrivati === m.totale) return '<div class="mat mat-ok">&#128230; ' + m.arrivati + '/' + m.totale + ' &middot; tutto a magazzino</div>';
+  if (!m) return '<span class="mat mat-nd">&#128230; nessun dato</span>';
+  if (m.arrivati === m.totale) return '<span class="mat mat-ok">&#128230; ' + m.totale + '/' + m.totale + ' a magazzino</span>';
   var cls = m.ritardo ? 'mat-ko' : 'mat-wait';
   var txt = m.ritardo ? '&#9888; ' + m.inRitardo + ' in ritardo' : (m.ultimo ? 'ultimo arrivo ' + m.ultimo : 'in arrivo');
-  return '<div class="mat ' + cls + '">&#128230; ' + m.arrivati + '/' + m.totale + ' &middot; ' + txt + '</div>';
+  return '<span class="mat ' + cls + '">&#128230; ' + m.arrivati + '/' + m.totale + ' &middot; ' + txt + '</span>';
 }
 
 function dettaglio(c) {
   var m = c.mat, h = '<h4>' + esc(c.name) + ' <button class="apri" data-apri="' + c.id + '">Apri scheda</button></h4>';
-  h += '<p>Presa in carico <b>' + (c.start ? new Date(c.start).toLocaleDateString('it-IT') : 'non indicata') + '</b> &middot; scadenza <b>' + (c.due ? new Date(c.due).toLocaleDateString('it-IT') : 'non indicata') + '</b></p>';
+  h += '<p>Presa in carico <b>' + (c.start ? gma(new Date(c.start)) : 'non indicata') + '</b> &middot; scadenza <b>' + (c.due ? gma(new Date(c.due)) : 'non indicata') + '</b> &middot; ' + etichetta(c.g, c.dueComplete) + '</p>';
   if (m === undefined) return h + '<p>Autorizza la lettura del materiale (pulsante in alto) per vedere il dettaglio.</p>';
   if (!m) return h + '<p>Nessuna checklist "' + CHECKLIST_MAT + '" su questa scheda.</p>';
   if (!m.mancanti.length) return h + '<p>Tutto il materiale (' + m.totale + ' pezzi) risulta a magazzino.</p>';
@@ -85,14 +97,19 @@ function dettaglio(c) {
 function disegna() {
   var area = document.getElementById('area');
   var wrap = document.getElementById('wrap');
+  var oggi = oggi0();
   var sel = carte.filter(function (c) { return c.idList === listaSel; });
   var conData = sel.filter(function (c) { return c.due; })
-    .map(function (c) { c.g = giorniMancanti(c.due); c.mat = calcolaMateriale(c); return c; })
-    .sort(function (a, b) { return b.g - a.g; });   // da sinistra a destra
+    .map(function (c) {
+      c.g = giorniMancanti(c.due); c.mat = calcolaMateriale(c);
+      c.d = giorno0(c.due); c.s = c.start ? giorno0(c.start) : null;
+      return c;
+    })
+    .sort(function (a, b) { return a.d - b.d; });   // prima le scadenze piu' vicine (o gia' passate)
   var senza = sel.filter(function (c) { return !c.due; });
 
   document.getElementById('nodata').innerHTML = senza.length
-    ? '<b>Senza data (' + senza.length + '):</b><br>' + senza.map(function (c) {
+    ? '<b>Senza scadenza (' + senza.length + '):</b><br>' + senza.map(function (c) {
         return '<span data-id="' + c.id + '">' + esc(c.name) + '</span>';
       }).join('')
     : '';
@@ -103,64 +120,106 @@ function disegna() {
     return;
   }
 
-  // Asse simmetrico attorno a oggi
-  var maxG = 14;
-  conData.forEach(function (c) { maxG = Math.max(maxG, Math.abs(c.g)); });
-  maxG = Math.ceil((maxG + 3) / 7) * 7;
-  var largh = Math.max(wrap.clientWidth - 2, 900);
-  var pxG = Math.max((largh - BOX_W) / (2 * maxG), 6);
-  var W = Math.round(2 * maxG * pxG + BOX_W);
-  var x0 = W / 2;
-  function xDi(g) { return x0 - g * pxG; }   // specchiata: in corso a sinistra, in ritardo a destra
-
-  // Righe: ogni casella va nella prima riga libera
-  var righe = [];
+  // Intervallo dell'asse: dalla presa in carico piu' vecchia alla scadenza piu' lontana (oggi sempre compreso)
+  var min = oggi, max = oggi;
   conData.forEach(function (c) {
-    var left = Math.min(Math.max(xDi(c.g) - BOX_W / 2, 0), W - BOX_W);
-    var r = 0;
-    while (righe[r] !== undefined && righe[r] > left - GAP) r++;
-    righe[r] = left + BOX_W;
-    c.left = left; c.riga = r;
+    var a = c.s && c.s < c.d ? c.s : c.d;
+    if (a < min) min = a;
+    if (c.d > max) max = c.d;
   });
-  var H = TOP + righe.length * (BOX_H + GAP) + 10;
+  min = new Date(min.getTime() - 7 * GIORNO);
+  max = new Date(max.getTime() + 14 * GIORNO);
+  var nGiorni = Math.round((max - min) / GIORNO);
+  var largh = Math.max(wrap.clientWidth - 2 - LAB_W, 600);
+  var pxG = Math.max(largh / nGiorni, 2.5);
+  var W = Math.round(LAB_W + nGiorni * pxG);
+  var H = TOP + conData.length * ROW_H + 8;
+  function xD(d) { return LAB_W + (d - min) / GIORNO * pxG; }
 
   var html = '';
-  var passo = maxG > 60 ? 14 : 7;
-  for (var g = -maxG; g <= maxG; g += passo) {
-    if (g === 0) continue;
-    var d = new Date(); d.setDate(d.getDate() + g);
-    html += '<div class="tick" style="left:' + xDi(g) + 'px"><span>' +
-      d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) + '</span></div>';
+  // righe alternate
+  conData.forEach(function (c, i) {
+    html += '<div class="fondo' + (i % 2 ? ' dispari' : '') + '" style="top:' + (TOP + i * ROW_H) + 'px;width:' + W + 'px;height:' + ROW_H + 'px"></div>';
+  });
+  // tacche: inizio di ogni mese (+ settimane se l'intervallo e' corto)
+  var d = new Date(min.getFullYear(), min.getMonth(), 1);
+  while (d <= max) {
+    if (d >= min) {
+      html += '<div class="tick mese" style="left:' + xD(d) + 'px"><span>' +
+        d.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' }) + '</span></div>';
+    }
+    d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
   }
-  html += '<div class="oggi" style="left:' + (x0 - 1) + 'px"><span>Oggi ' +
-    new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) + '</span></div>';
+  if (nGiorni <= 150) {
+    var w = new Date(min); w.setDate(w.getDate() + ((8 - w.getDay()) % 7));   // lunedi'
+    for (; w <= max; w.setDate(w.getDate() + 7)) {
+      if (w.getDate() !== 1) html += '<div class="tick settimana" style="left:' + xD(w) + 'px"></div>';
+    }
+  }
+  html += '<div class="intest" style="width:' + (LAB_W - 8) + 'px">Presa in carico &rarr; scadenza</div>';
+  html += '<div class="oggi" style="left:' + (xD(oggi) - 1) + 'px"><span>Oggi ' + gm(oggi) + '</span></div>';
 
-  conData.forEach(function (c) {
+  conData.forEach(function (c, i) {
     var col = colore(c.g, c.dueComplete);
-    var top = TOP + c.riga * (BOX_H + GAP);
+    var y = TOP + i * ROW_H;
     var b = c.badges || {};
     var tot = (b.checkItems || 0) - (c.mat ? c.mat.voci : 0), fatti = (b.checkItemsChecked || 0) - (c.mat ? c.mat.vociFatte : 0);
-    var ck = tot > 0 ? ' · ☑ ' + fatti + '/' + tot : '';
-    html += '<div class="pin ' + col + '" style="left:' + xDi(c.g) + 'px;top:' + (TOP - 6) + 'px;height:' + (top - TOP + 6) + 'px"></div>';
-    html += '<div class="box ' + col + (c.mat && c.mat.ritardo ? ' alert' : '') + '" data-id="' + c.id + '" title="' + esc(c.name) + '" style="left:' + c.left + 'px;top:' + top + 'px">' +
-      '<b>' + esc(c.name) + '</b>' + formattaData(c.due) + '<br>' +
-      '<strong>' + etichetta(c.g, c.dueComplete) + '</strong><span class="ck">' + ck + '</span>' + rigaMateriale(c) + '</div>';
+    var ck = tot > 0 ? ' &middot; <span class="ck">&#9745; ' + fatti + '/' + tot + '</span>' : '';
+    var alert = c.mat && c.mat.ritardo ? ' alert' : '';
+
+    // etichetta a sinistra
+    html += '<div class="lab' + (i % 2 ? ' dispari' : '') + alert + '" data-id="' + c.id + '" style="top:' + y + 'px;height:' + ROW_H + 'px" title="' + esc(c.name) + '">' +
+      '<b>' + esc(c.name) + '</b><span class="sub">' + (c.s ? gm(c.s) : '--/--') + ' &rarr; ' + gm(c.d) + ' &middot; <b class="eti ' + colore(c.g, c.dueComplete) + '">' + etichetta(c.g, c.dueComplete) + '</b></span>' +
+      '<span class="sub">' + testoMateriale(c.mat) + ck + '</span></div>';
+
+    // barra: presa in carico -> scadenza
+    var x1 = c.s ? xD(c.s) : xD(c.d) - 40, x2 = xD(c.d);
+    if (x2 - x1 < 6) x1 = x2 - 6;
+    var ritardo = c.g < 0 && !c.dueComplete;
+    var yb = y + Math.round((ROW_H - 22) / 2), testo = esc(codice(c.name));
+    var stretta = (x2 - x1) < 95;
+    html += '<div class="bar ' + col + (c.s ? '' : ' noinizio') + alert + '" data-id="' + c.id + '" style="left:' + x1 + 'px;top:' + yb + 'px;width:' + (x2 - x1) + 'px">' +
+      (testo && !stretta ? '<span>' + testo + '</span>' : '') + '</div>';
+    if (testo && stretta) html += '<div class="fuori sx" style="left:' + (x1 - 206) + 'px;top:' + yb + 'px">' + testo + '</div>';
+    // in ritardo: la barra "sborda" dalla scadenza fino a oggi
+    if (ritardo) {
+      var wc = Math.max(xD(oggi) - x2, 3);
+      html += '<div class="coda ' + col + '" data-id="' + c.id + '" style="left:' + x2 + 'px;top:' + yb + 'px;width:' + wc + 'px">' +
+        (wc >= 48 ? '<span>+' + (-c.g) + ' g</span>' : '') + '</div>';
+      if (wc < 48) html += '<div class="fuori rit" style="left:' + (x2 + wc + 6) + 'px;top:' + yb + 'px">+' + (-c.g) + ' g</div>';
+    }
+    // segno della scadenza
+    html += '<div class="scad" style="left:' + (x2 - 1) + 'px;top:' + (yb - 4) + 'px"></div>';
+    // arrivo dell'ultimo pezzo atteso
+    if (c.mat && c.mat.ultimoD) {
+      var late = c.mat.ultimoD > c.d || c.mat.ultimoD < oggi;
+      html += '<div class="mk' + (late ? ' late' : '') + '" title="Ultimo pezzo atteso il ' + gma(c.mat.ultimoD) + '" style="left:' + (xD(c.mat.ultimoD) - 5) + 'px;top:' + (yb + 17) + 'px"></div>';
+    }
   });
 
   area.style.width = W + 'px';
   area.style.height = H + 'px';
   area.innerHTML = html;
-  wrap.scrollLeft = x0 - wrap.clientWidth / 2;
+  wrap.scrollLeft = Math.max(xD(oggi) - wrap.clientWidth * 0.6, 0);
+  fissaEtichette();
 }
+
+// le etichette a sinistra restano ferme quando si scorre la linea del tempo
+function fissaEtichette() {
+  var sx = document.getElementById('wrap').scrollLeft + 'px';
+  Array.prototype.forEach.call(document.querySelectorAll('.lab, .intest'), function (l) { l.style.left = sx; });
+}
+document.getElementById('wrap').addEventListener('scroll', fissaEtichette);
 
 document.body.addEventListener('click', function (e) {
   var ap = e.target.closest('[data-apri]');
   if (ap) { t.showCard(ap.getAttribute('data-apri')); return; }
   if (e.target.closest('#autorizza')) { autorizza(); return; }
-  var box = e.target.closest('.box[data-id]');
-  if (box) {
-    var c = carte.filter(function (x) { return x.id === box.getAttribute('data-id'); })[0];
-    Array.prototype.forEach.call(document.querySelectorAll('.box'), function (b) { b.classList.toggle('sel', b === box); });
+  var riga = e.target.closest('#area [data-id]');
+  if (riga) {
+    var id = riga.getAttribute('data-id');
+    var c = carte.filter(function (x) { return x.id === id; })[0];
+    Array.prototype.forEach.call(document.querySelectorAll('#area [data-id]'), function (b) { b.classList.toggle('sel', b.getAttribute('data-id') === id); });
     document.getElementById('det').innerHTML = dettaglio(c);
     return;
   }
@@ -196,6 +255,7 @@ function autorizza() {
 document.getElementById('lista').addEventListener('change', function () {
   listaSel = this.value;
   t.set('board', 'private', 'listaTimeline', listaSel);
+  document.getElementById('det').innerHTML = '<i>Clicca una commessa per vedere il dettaglio del materiale.</i>';
   disegna();
 });
 
