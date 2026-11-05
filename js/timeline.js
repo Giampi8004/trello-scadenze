@@ -356,7 +356,7 @@ t.render(function () {
     leggiListeEscluse(t)
   ]).then(function (r) {
     carte = r[0]; liste = r[1]; escluse = r[3];
-    var salvata = liste.some(function (l) { return l.id === r[2]; }) ? r[2] : null;
+    var salvata = (r[2] === TUTTE || liste.some(function (l) { return l.id === r[2]; })) ? r[2] : null;
     var prod = liste.filter(function (l) { return /IN PRODUZIONE/i.test(l.name); })[0];
     listaSel = SOLO_TUTTE ? TUTTE : (salvata || (prod ? prod.id : (liste[0] && liste[0].id)));
     document.getElementById('lista').innerHTML =
