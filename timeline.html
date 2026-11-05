@@ -55,6 +55,11 @@
     .mk { position: absolute; width: 9px; height: 9px; background: #0c66e4; transform: rotate(45deg); z-index: 4; border: 1px solid #fff; }
     .mk.late { background: #c9372c; }
     .leg .lmk.late { background: #c9372c; }
+    .tappa { position: absolute; z-index: 4; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid #172b4d; box-sizing: border-box;
+             font-size: 9px; font-weight: 800; line-height: 12px; text-align: center; color: #172b4d; cursor: pointer; }
+    .tappa.produzione { font-size: 7px; }
+    .tappa.rilievo { border-color: #0055cc; color: #0055cc; } .tappa.progetto { border-color: #6e5dc6; color: #6e5dc6; } .tappa.finiture { border-color: #a54800; color: #a54800; } .tappa.produzione { border-color: #172b4d; }
+    .leg .tappa { position: relative; top: auto; display: inline-block; vertical-align: middle; margin-right: 4px; }
     .nodata { margin-top: 12px; font-size: 13px; }
     .nodata span { display: inline-block; margin: 4px 6px 0 0; padding: 4px 8px; background: #dcdfe4; border-radius: 4px; cursor: pointer; }
     #det { margin-top: 12px; background: #fff; border: 1px solid #dcdfe4; border-radius: 8px; padding: 10px 14px; font-size: 13px; }
@@ -76,6 +81,10 @@
       <span><i style="background:#8270db"></i>In ritardo da pi&ugrave; di 10 giorni</span>
       <span><span class="lmk"></span>ultimo pezzo atteso</span>
       <span><span class="lmk late"></span>atteso dopo la scadenza o in ritardo</span>
+      <span><span class="tappa rilievo">R</span>rilievo</span>
+      <span><span class="tappa progetto">P</span>progetto</span>
+      <span><span class="tappa finiture">F</span>finiture</span>
+      <span><span class="tappa produzione">&#9654;</span>in produzione</span>
     </div>
   </div>
   <div id="auth" style="display:none">&#128230; Per vedere il materiale da Ready Web serve autorizzare (una volta sola) la lettura delle checklist. <button id="autorizza">Autorizza</button></div>
@@ -83,7 +92,7 @@
   <div id="det"><i>Clicca una commessa per vedere il dettaglio del materiale.</i></div>
   <div class="nodata" id="nodata"></div>
 
-  <script src="./js/common.js?v=6"></script>
-  <script src="./js/timeline.js?v=6"></script>
+  <script src="./js/common.js?v=7"></script>
+  <script src="./js/timeline.js?v=7"></script>
 </body>
 </html>
