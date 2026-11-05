@@ -8,7 +8,9 @@ var CHECKLIST_DATE = 'Date commessa';   // scritta dal server: "Finiture gg/mm/a
 var dateComm = {};                       // idScheda -> checklist "Date commessa"
 var t = TrelloPowerUp.iframe({ appKey: APP_KEY, appName: 'Scadenze' });
 var materiale = null;   // null = non autorizzato/non caricato; {} = mappa idScheda -> checklist
-var carte = [], liste = [], listaSel = null;
+var carte = [], liste = [], listaSel = null, escluse = null;
+var TUTTE = '*';                                   // "Tutti gli impianti" (pulsante Dashboard)
+var SOLO_TUTTE = /[?&]tutte=1/.test(location.search);
 var LAB_W = 280, ROW_H = 58, TOP = 30, GIORNO = 86400000;
 
 function esc(s) {
@@ -20,6 +22,15 @@ function esc(s) {
 function codice(nome) {
   var m = /^\s*(\d{3,5})\s*[-\/ ]?\s*([A-Za-z])\b/.exec(nome || '');
   return m ? m[1] + '-' + m[2].toUpperCase() : String(nome || '').split(/\s+/)[0];
+}
+// lista (fase) della scheda e nome corto: "COMMESSE IN PRODUZIONE" -> "IN PRODUZIONE"
+function listaDi(c) { return liste.filter(function (l) { return l.id === c.idList; })[0]; }
+function fase(c) {
+  var l = listaDi(c);
+  if (!l) return '';
+  var n = l.name.replace(/^COMMESSE[\s_]*/i, '').replace(/_/g, ' ').replace(/\(.*\)/, '')
+    .replace(/^IN\s+/i, '').replace(/\s+DA COMPLETARE$/i, '').trim();
+  return n.length > 16 ? n.slice(0, 15) + '\u2026' : n;
 }
 function oggi0() { var d = new Date(); d.setHours(0, 0, 0, 0); return d; }
 function giorno0(x) { var d = new Date(x); d.setHours(0, 0, 0, 0); return d; }
@@ -156,7 +167,9 @@ function disegna() {
   var area = document.getElementById('area');
   var wrap = document.getElementById('wrap');
   var oggi = oggi0();
-  var sel = carte.filter(function (c) { return c.idList === listaSel; });
+  var sel = listaSel === TUTTE
+    ? carte.filter(function (c) { return !listaEsclusa(listaDi(c), escluse); })
+    : carte.filter(function (c) { return c.idList === listaSel; });
   var conData = sel.filter(function (c) { return c.due; })
     .map(function (c) {
       c.g = giorniMancanti(c.due); c.mat = calcolaMateriale(c);
@@ -229,7 +242,7 @@ function disegna() {
 
     // etichetta a sinistra
     html += '<div class="lab' + (i % 2 ? ' dispari' : '') + alert + '" data-id="' + c.id + '" style="top:' + y + 'px;height:' + ROW_H + 'px" title="' + esc(c.name) + '">' +
-      '<b>' + esc(c.name) + '</b><span class="sub">' + (c.s ? gm(c.s) : '--/--') + ' &rarr; ' + gm(c.d) + ' &middot; <b class="eti ' + colore(c.g, c.dueComplete) + '">' + etichetta(c.g, c.dueComplete) + '</b></span>' +
+      '<b>' + esc(c.name) + '</b><span class="sub">' + (listaSel === TUTTE ? '<span class="fase">' + esc(fase(c)) + '</span> ' : '') + (c.s ? gm(c.s) : '--/--') + ' &rarr; ' + gm(c.d) + ' &middot; <b class="eti ' + colore(c.g, c.dueComplete) + '">' + etichetta(c.g, c.dueComplete) + '</b></span>' +
       '<span class="sub">' + testoMateriale(c.mat) + ck + '</span></div>';
 
     // barra: presa in carico -> scadenza
@@ -328,7 +341,7 @@ function autorizza() {
 
 document.getElementById('lista').addEventListener('change', function () {
   listaSel = this.value;
-  t.set('board', 'private', 'listaTimeline', listaSel);
+  if (!SOLO_TUTTE) t.set('board', 'private', 'listaTimeline', listaSel);
   document.getElementById('det').innerHTML = '<i>Clicca una commessa per vedere il dettaglio del materiale.</i>';
   disegna();
 });
@@ -339,15 +352,18 @@ t.render(function () {
   return Promise.all([
     t.cards('id', 'name', 'start', 'due', 'dueComplete', 'idList', 'badges'),
     t.lists('id', 'name'),
-    t.get('board', 'private', 'listaTimeline', null)
+    t.get('board', 'private', 'listaTimeline', null),
+    leggiListeEscluse(t)
   ]).then(function (r) {
-    carte = r[0]; liste = r[1];
+    carte = r[0]; liste = r[1]; escluse = r[3];
     var salvata = liste.some(function (l) { return l.id === r[2]; }) ? r[2] : null;
     var prod = liste.filter(function (l) { return /IN PRODUZIONE/i.test(l.name); })[0];
-    listaSel = salvata || (prod ? prod.id : (liste[0] && liste[0].id));
-    document.getElementById('lista').innerHTML = liste.map(function (l) {
-      return '<option value="' + l.id + '"' + (l.id === listaSel ? ' selected' : '') + '>' + esc(l.name) + '</option>';
-    }).join('');
+    listaSel = SOLO_TUTTE ? TUTTE : (salvata || (prod ? prod.id : (liste[0] && liste[0].id)));
+    document.getElementById('lista').innerHTML =
+      '<option value="' + TUTTE + '"' + (listaSel === TUTTE ? ' selected' : '') + '>TUTTI GLI IMPIANTI</option>' +
+      liste.map(function (l) {
+        return '<option value="' + l.id + '"' + (l.id === listaSel ? ' selected' : '') + '>' + esc(l.name) + '</option>';
+      }).join('');
     return caricaMateriale();
   }).then(function () { disegna(); });
 });
