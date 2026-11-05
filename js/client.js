@@ -36,7 +36,16 @@ TrelloPowerUp.initialize({
 
   // Badge dentro la scheda aperta
   'card-detail-badges': function (t) {
-    return badgeScadenza(t, true);
+    return Promise.all([badgeScadenza(t, true), t.card('start')]).then(function (r) {
+      var badge = r[0].slice();
+      if (r[1].start) {   // la "Data di inizio" di Trello = data della presa in carico
+        badge.unshift({
+          title: 'Presa in carico',
+          text: new Date(r[1].start).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        });
+      }
+      return badge;
+    });
   },
 
   // Pulsante in alto sulla bacheca → riepilogo scadenze
