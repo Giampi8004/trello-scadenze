@@ -9,30 +9,54 @@
     body { margin: 0; padding: 12px 16px; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: #172b4d; background: #f7f8f9; }
     .top { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 10px; }
     .top select { margin: 0; width: auto; }
-    .leg { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #44546f; }
-    .leg i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; }
+    .leg { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #44546f; align-items: center; }
+    .leg i { display: inline-block; width: 14px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; }
+    .leg .lmk { display: inline-block; width: 8px; height: 8px; background: #0c66e4; transform: rotate(45deg); margin: 0 5px 0 2px; }
     #wrap { position: relative; overflow-x: auto; overflow-y: hidden; background: #fff; border: 1px solid #dcdfe4; border-radius: 8px; }
     #area { position: relative; }
-    .tick { position: absolute; top: 0; bottom: 0; border-left: 1px dashed #e4e6ea; }
-    .tick span { position: absolute; top: 4px; left: 4px; font-size: 11px; color: #8590a2; white-space: nowrap; }
-    .oggi { position: absolute; top: 0; bottom: 0; border-left: 3px solid #0c66e4; z-index: 2; }
-    .oggi span { position: absolute; top: 4px; left: 6px; background: #0c66e4; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
-    .box { position: absolute; z-index: 3; width: 180px; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 12px; line-height: 1.3; box-shadow: 0 1px 2px rgba(9,30,66,.25); border-left: 5px solid rgba(0,0,0,.25); }
-    .box:hover { filter: brightness(.95); }
-    .box b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .box .ck { opacity: .85; }
-    .pin { position: absolute; z-index: 1; width: 2px; }
-    .verde { background: #baf3db; color: #164b35; } .pin.verde { background: #4bce97; }
-    .giallo { background: #f8e6a0; color: #533f04; } .pin.giallo { background: #e2b203; }
-    .rosso { background: #ffd5d2; color: #5d1f1a; } .pin.rosso { background: #f87168; }
-    .viola { background: #dfd8fd; color: #352c63; } .pin.viola { background: #9f8fef; }
-    .grigio { background: #dcdfe4; color: #44546f; } .pin.grigio { background: #8590a2; }
+    .fondo { position: absolute; left: 0; background: #fff; }
+    .fondo.dispari { background: #f7f8f9; }
+    .tick { position: absolute; top: 0; bottom: 0; }
+    .tick.mese { border-left: 1px solid #dcdfe4; }
+    .tick.mese span { position: absolute; top: 6px; left: 4px; font-size: 11px; font-weight: 600; color: #626f86; white-space: nowrap; text-transform: capitalize; }
+    .tick.settimana { border-left: 1px dashed #ebecf0; }
+    .oggi { position: absolute; top: 0; bottom: 0; border-left: 3px solid #0c66e4; z-index: 4; pointer-events: none; }
+    .oggi span { position: absolute; top: 22px; left: 4px; background: #0c66e4; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+    .lab { position: absolute; left: 0; width: 272px; box-sizing: border-box; padding: 4px 8px; z-index: 5; cursor: pointer;
+           background: #fff; border-right: 1px solid #dcdfe4; font-size: 12px; line-height: 1.3; overflow: hidden; }
+    .lab.dispari { background: #f7f8f9; }
+    .lab b { display: block; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lab .sub b.eti { display: inline; font-size: 12px; }
+    .eti.verde { color: #216e4e; } .eti.giallo { color: #7f5f01; } .eti.rosso { color: #ae2e24; } .eti.viola { color: #5e4db2; } .eti.grigio { color: #626f86; }
+    .lab .sub { display: block; color: #626f86; white-space: nowrap; }
+    .fuori { position: absolute; z-index: 3; font-size: 11px; font-weight: 700; line-height: 22px; color: #44546f; white-space: nowrap; }
+    .fuori.rit { color: #ae2e24; }
+    .fuori.sx { width: 200px; text-align: right; }
+    .intest { position: absolute; top: 0; left: 0; height: 30px; line-height: 30px; padding-left: 10px; font-size: 11px; font-weight: 600; color: #626f86; background: #fff; z-index: 5; border-right: 1px solid #dcdfe4; }
+    .ck { color: #626f86; font-weight: 400; }
+    .lab.alert > b { color: #ae2e24; }
+    .lab.sel { background: #e9f2ff; }
+    .mat { font-weight: 600; white-space: nowrap; }
+    .mat-ok { color: #216e4e; } .mat-wait { color: #7f5f01; } .mat-ko { color: #ae2e24; } .mat-nd { color: #8590a2; font-weight: 400; }
+    .bar, .coda { position: absolute; height: 22px; border-radius: 5px; z-index: 3; cursor: pointer; box-sizing: border-box; overflow: hidden; }
+    .bar span, .coda span { display: block; padding: 0 8px; font-size: 12px; font-weight: 700; line-height: 22px; white-space: nowrap; }
+    .bar.verde { background: #4bce97; color: #0b3b26; }
+    .bar.giallo { background: #f5cd47; color: #533f04; }
+    .bar.rosso { background: #fd9891; color: #5d1f1a; }
+    .bar.viola { background: #b8acf6; color: #352c63; }
+    .bar.grigio { background: #c1c7d0; color: #44546f; }
+    .bar.noinizio { background-image: linear-gradient(90deg, #fff 0, transparent 70%); }
+    .bar.alert { box-shadow: inset 0 0 0 2px #c9372c; }
+    .coda { border-radius: 0 5px 5px 0; }
+    .coda.rosso { background: repeating-linear-gradient(135deg, #e2483d 0 6px, #c9372c 6px 12px); color: #fff; }
+    .coda.viola { background: repeating-linear-gradient(135deg, #8270db 0 6px, #6e5dc6 6px 12px); color: #fff; }
+    .bar.sel, .coda.sel { outline: 3px solid #0c66e4; outline-offset: 1px; }
+    .scad { position: absolute; width: 2px; height: 30px; background: #172b4d; z-index: 3; pointer-events: none; }
+    .mk { position: absolute; width: 9px; height: 9px; background: #0c66e4; transform: rotate(45deg); z-index: 4; border: 1px solid #fff; }
+    .mk.late { background: #c9372c; }
+    .leg .lmk.late { background: #c9372c; }
     .nodata { margin-top: 12px; font-size: 13px; }
     .nodata span { display: inline-block; margin: 4px 6px 0 0; padding: 4px 8px; background: #dcdfe4; border-radius: 4px; cursor: pointer; }
-    .mat { margin-top: 3px; padding-top: 3px; border-top: 1px solid rgba(0,0,0,.12); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .mat-ok { color: #216e4e; } .mat-wait { color: #7f5f01; } .mat-ko { color: #ae2e24; } .mat-nd { color: #626f86; font-weight: 400; }
-    .box.alert { outline: 2px solid #e34935; outline-offset: -2px; }
-    .box.sel { box-shadow: 0 0 0 3px #0c66e4; }
     #det { margin-top: 12px; background: #fff; border: 1px solid #dcdfe4; border-radius: 8px; padding: 10px 14px; font-size: 13px; }
     #det h4 { margin: 0 0 4px; } #det p { margin: 0 0 8px; color: #44546f; }
     #det table { border-collapse: collapse; width: 100%; } #det th, #det td { text-align: left; padding: 4px 6px; border-bottom: 1px solid #ebecf0; }
@@ -46,10 +70,12 @@
   <div class="top">
     <label>Lista <select id="lista"></select></label>
     <div class="leg">
-      <span><i class="verde"></i>Oltre 10 giorni</span>
-      <span><i class="giallo"></i>Entro 10 giorni</span>
-      <span><i class="rosso"></i>Scadute</span>
-      <span><i class="viola"></i>Scadute da più di 10 giorni</span>
+      <span><i style="background:#4bce97"></i>Oltre 10 giorni</span>
+      <span><i style="background:#f5cd47"></i>Entro 10 giorni</span>
+      <span><i style="background:#e2483d"></i>In ritardo</span>
+      <span><i style="background:#8270db"></i>In ritardo da pi&ugrave; di 10 giorni</span>
+      <span><span class="lmk"></span>ultimo pezzo atteso</span>
+      <span><span class="lmk late"></span>atteso dopo la scadenza o in ritardo</span>
     </div>
   </div>
   <div id="auth" style="display:none">&#128230; Per vedere il materiale da Ready Web serve autorizzare (una volta sola) la lettura delle checklist. <button id="autorizza">Autorizza</button></div>
@@ -57,7 +83,7 @@
   <div id="det"><i>Clicca una commessa per vedere il dettaglio del materiale.</i></div>
   <div class="nodata" id="nodata"></div>
 
-  <script src="./js/common.js?v=5"></script>
-  <script src="./js/timeline.js?v=5"></script>
+  <script src="./js/common.js?v=6"></script>
+  <script src="./js/timeline.js?v=6"></script>
 </body>
 </html>
