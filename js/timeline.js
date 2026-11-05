@@ -131,7 +131,7 @@ function disegna() {
   max = new Date(max.getTime() + 14 * GIORNO);
   var nGiorni = Math.round((max - min) / GIORNO);
   var largh = Math.max(wrap.clientWidth - 2 - LAB_W, 600);
-  var pxG = Math.max(largh / nGiorni, 2.5);
+  var pxG = Math.max(largh / nGiorni, 1);
   var W = Math.round(LAB_W + nGiorni * pxG);
   var H = TOP + conData.length * ROW_H + 8;
   function xD(d) { return LAB_W + (d - min) / GIORNO * pxG; }
