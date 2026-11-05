@@ -71,10 +71,11 @@ function rigaMateriale(c) {
 
 function dettaglio(c) {
   var m = c.mat, h = '<h4>' + esc(c.name) + ' <button class="apri" data-apri="' + c.id + '">Apri scheda</button></h4>';
+  h += '<p>Presa in carico <b>' + (c.start ? new Date(c.start).toLocaleDateString('it-IT') : 'non indicata') + '</b> &middot; scadenza <b>' + (c.due ? new Date(c.due).toLocaleDateString('it-IT') : 'non indicata') + '</b></p>';
   if (m === undefined) return h + '<p>Autorizza la lettura del materiale (pulsante in alto) per vedere il dettaglio.</p>';
   if (!m) return h + '<p>Nessuna checklist "' + CHECKLIST_MAT + '" su questa scheda.</p>';
   if (!m.mancanti.length) return h + '<p>Tutto il materiale (' + m.totale + ' pezzi) risulta a magazzino.</p>';
-  h += '<p>Materiale arrivato <b>' + m.arrivati + ' su ' + m.totale + '</b> &middot; scadenza commessa ' + formattaData(c.due) + '</p><table><tr><th>Pezzo</th><th>Fornitore</th><th>Stato</th><th>Arrivo</th><th></th><th>Ordine</th></tr>';
+  h += '<p>Materiale arrivato <b>' + m.arrivati + ' su ' + m.totale + '</b></p><table><tr><th>Pezzo</th><th>Fornitore</th><th>Stato</th><th>Arrivo</th><th></th><th>Ordine</th></tr>';
   m.mancanti.forEach(function (x) {
     h += '<tr' + (x[4] ? ' class="rit"' : '') + '><td>' + esc(x[0]) + '</td><td>' + esc(x[1]) + '</td><td>' + x[2] + '</td><td>' + x[3] + '</td><td>' + (x[4] || '') + '</td><td>' + esc(x[5]) + '</td></tr>';
   });
@@ -202,7 +203,7 @@ window.addEventListener('resize', function () { if (carte.length) disegna(); });
 
 t.render(function () {
   return Promise.all([
-    t.cards('id', 'name', 'due', 'dueComplete', 'idList', 'badges'),
+    t.cards('id', 'name', 'start', 'due', 'dueComplete', 'idList', 'badges'),
     t.lists('id', 'name'),
     t.get('board', 'private', 'listaTimeline', null)
   ]).then(function (r) {
