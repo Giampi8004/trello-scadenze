@@ -4,6 +4,8 @@
    Materiale dalla checklist "Materiale fornitori" (aggiornata dal server da Ready Web). */
 var APP_KEY = 'f5089339fa1b492c9a45601594a6982c';
 var CHECKLIST_MAT = 'Materiale fornitori';
+var CHECKLIST_DATE = 'Date commessa';   // scritta dal server: "Finiture gg/mm/aaaa [file]"
+var dateComm = {};                       // idScheda -> checklist "Date commessa"
 var t = TrelloPowerUp.iframe({ appKey: APP_KEY, appName: 'Scadenze' });
 var materiale = null;   // null = non autorizzato/non caricato; {} = mappa idScheda -> checklist
 var carte = [], liste = [], listaSel = null;
@@ -84,6 +86,8 @@ function testoMateriale(m) {
 function dettaglio(c) {
   var m = c.mat, h = '<h4>' + esc(c.name) + ' <button class="apri" data-apri="' + c.id + '">Apri scheda</button></h4>';
   h += '<p>Presa in carico <b>' + (c.start ? gma(new Date(c.start)) : 'non indicata') + '</b> &middot; scadenza <b>' + (c.due ? gma(new Date(c.due)) : 'non indicata') + '</b> &middot; ' + etichetta(c.g, c.dueComplete) + '</p>';
+  var tp = tappe[c.id] ? tappeDi(c.id) : null;
+  if (tp) h += '<p>' + TAPPE.map(function (x) { return x.nome + ' <b>' + (tp[x.k] ? gma(tp[x.k]) : '&ndash;') + '</b>'; }).join(' &middot; ') + '</p>';
   if (m === undefined) return h + '<p>Autorizza la lettura del materiale (pulsante in alto) per vedere il dettaglio.</p>';
   if (!m) return h + '<p>Nessuna checklist "' + CHECKLIST_MAT + '" su questa scheda.</p>';
   if (!m.mancanti.length) return h + '<p>Tutto il materiale (' + m.totale + ' pezzi) risulta a magazzino.</p>';
@@ -92,6 +96,60 @@ function dettaglio(c) {
     h += '<tr' + (x[4] ? ' class="rit"' : '') + '><td>' + esc(x[0]) + '</td><td>' + esc(x[1]) + '</td><td>' + x[2] + '</td><td>' + x[3] + '</td><td>' + (x[4] || '') + '</td><td>' + esc(x[5]) + '</td></tr>';
   });
   return h + '</table>';
+}
+
+// ---------- Milestone dalla cronologia di Trello ----------
+// Rilievo   = giorno in cui e' stata spuntata la voce "Rilievo"  (in mancanza: spostamento in RILIEVO FATTO)
+// Progetto  = giorno in cui e' stata spuntata la voce "Layout"   (in mancanza: spostamento in COMMESSE IN PRODUZIONE)
+// Produzione= giorno in cui la scheda e' entrata in COMMESSE IN PRODUZIONE
+var TAPPE = [
+  { k: 'rilievo', lettera: 'R', nome: 'Rilievo' },
+  { k: 'progetto', lettera: 'P', nome: 'Progetto' },
+  { k: 'finiture', lettera: 'F', nome: 'Finiture' },
+  { k: 'produzione', lettera: '&#9654;', nome: 'In produzione' }
+];
+var tappe = {}, tokenApi = null, caricoTappe = false;
+
+function calcolaTappe(azioni) {
+  var r = {}, spunte = {}, spost = {};
+  // le azioni arrivano dalla piu' recente: si tiene la piu' recente "spuntata" / il primo ingresso nella lista
+  azioni.forEach(function (a) {
+    var d = giorno0(a.date);
+    if (a.type === 'updateCheckItemStateOnCard' && a.data.checkItem && a.data.checkItem.state === 'complete') {
+      var n = (a.data.checkItem.name || '').trim().toLowerCase();
+      if (!spunte[n]) spunte[n] = d;
+    }
+    if (a.type === 'updateCard' && a.data.listAfter) spost[a.data.listAfter.name.trim().toUpperCase()] = d;   // resta il primo ingresso
+  });
+  function lista(rx) { for (var k in spost) if (rx.test(k)) return spost[k]; return null; }
+  r.rilievo = spunte['rilievo'] || lista(/RILIEVO FATTO/);
+  r.produzione = lista(/IN PRODUZIONE/);
+  r.progetto = spunte['layout'] || r.produzione;
+  return r;
+}
+
+// milestone dalla cronologia + data finiture dalla checklist "Date commessa"
+function tappeDi(id) {
+  var r = {}, tp = tappe[id] || {};
+  for (var k in tp) r[k] = tp[k];
+  var dc = dateComm[id];
+  if (dc) dc.checkItems.forEach(function (it) {
+    var m = /^Finiture\s+(\d{2}\/\d{2}\/\d{4})/.exec(it.name);
+    if (m) r.finiture = parseData(m[1]);
+  });
+  return r;
+}
+
+function caricaTappe(ids) {
+  var mancano = ids.filter(function (id) { return !tappe[id]; });
+  if (!tokenApi || !mancano.length || caricoTappe) return Promise.resolve(false);
+  caricoTappe = true;
+  return Promise.all(mancano.map(function (id) {
+    return fetch('https://api.trello.com/1/cards/' + id + '/actions?filter=updateCheckItemStateOnCard,updateCard:idList&limit=300&fields=type,date,data&key=' + APP_KEY + '&token=' + tokenApi)
+      .then(function (x) { return x.json(); })
+      .then(function (az) { tappe[id] = calcolaTappe(az || []); })
+      .catch(function () { tappe[id] = {}; });
+  })).then(function () { caricoTappe = false; return true; });
 }
 
 function disegna() {
@@ -163,7 +221,9 @@ function disegna() {
     var col = colore(c.g, c.dueComplete);
     var y = TOP + i * ROW_H;
     var b = c.badges || {};
-    var tot = (b.checkItems || 0) - (c.mat ? c.mat.voci : 0), fatti = (b.checkItemsChecked || 0) - (c.mat ? c.mat.vociFatte : 0);
+    var dcn = dateComm[c.id] ? dateComm[c.id].checkItems.length : 0;
+    var dcf = dateComm[c.id] ? dateComm[c.id].checkItems.filter(function (x) { return x.state === 'complete'; }).length : 0;
+    var tot = (b.checkItems || 0) - (c.mat ? c.mat.voci : 0) - dcn, fatti = (b.checkItemsChecked || 0) - (c.mat ? c.mat.vociFatte : 0) - dcf;
     var ck = tot > 0 ? ' &middot; <span class="ck">&#9745; ' + fatti + '/' + tot + '</span>' : '';
     var alert = c.mat && c.mat.ritardo ? ' alert' : '';
 
@@ -176,7 +236,7 @@ function disegna() {
     var x1 = c.s ? xD(c.s) : xD(c.d) - 40, x2 = xD(c.d);
     if (x2 - x1 < 6) x1 = x2 - 6;
     var ritardo = c.g < 0 && !c.dueComplete;
-    var yb = y + Math.round((ROW_H - 22) / 2), testo = esc(codice(c.name));
+    var yb = y + Math.round((ROW_H - 22) / 2) + 5, testo = esc(codice(c.name));
     var stretta = (x2 - x1) < 95;
     html += '<div class="bar ' + col + (c.s ? '' : ' noinizio') + alert + '" data-id="' + c.id + '" style="left:' + x1 + 'px;top:' + yb + 'px;width:' + (x2 - x1) + 'px">' +
       (testo && !stretta ? '<span>' + testo + '</span>' : '') + '</div>';
@@ -188,6 +248,16 @@ function disegna() {
         (wc >= 48 ? '<span>+' + (-c.g) + ' g</span>' : '') + '</div>';
       if (wc < 48) html += '<div class="fuori rit" style="left:' + (x2 + wc + 6) + 'px;top:' + yb + 'px">+' + (-c.g) + ' g</div>';
     }
+    // milestone (rilievo, progetto, ingresso in produzione)
+    // sopra la barra, appoggiate al bordo; se troppo vicine si affiancano (la data esatta e' nel tooltip)
+    var tp = tappeDi(c.id), ultimaX = -99;
+    TAPPE.filter(function (m) { return tp[m.k]; })
+      .sort(function (a, b2) { return tp[a.k] - tp[b2.k]; })
+      .forEach(function (m) {
+        var xm = Math.max(xD(tp[m.k]) - 8, ultimaX + 16);
+        ultimaX = xm;
+        html += '<div class="tappa ' + m.k + '" data-id="' + c.id + '" title="' + m.nome + ' ' + gma(tp[m.k]) + '" style="left:' + xm + 'px;top:' + (yb - 11) + 'px">' + m.lettera + '</div>';
+      });
     // segno della scadenza
     html += '<div class="scad" style="left:' + (x2 - 1) + 'px;top:' + (yb - 4) + 'px"></div>';
     // arrivo dell'ultimo pezzo atteso
@@ -202,6 +272,7 @@ function disegna() {
   area.innerHTML = html;
   wrap.scrollLeft = Math.max(xD(oggi) - wrap.clientWidth * 0.6, 0);
   fissaEtichette();
+  caricaTappe(conData.map(function (c) { return c.id; })).then(function (nuove) { if (nuove) disegna(); });
 }
 
 // le etichette a sinistra restano ferme quando si scorre la linea del tempo
@@ -233,6 +304,7 @@ function caricaMateriale() {
     document.getElementById('auth').style.display = ok ? 'none' : '';
     if (!ok) { materiale = null; return; }
     return Promise.all([api.getToken(), t.board('id')]).then(function (r) {
+      tokenApi = r[0];
       return fetch('https://api.trello.com/1/boards/' + r[1].id + '/cards?fields=id&checklists=all&checklist_fields=name&key=' + APP_KEY + '&token=' + r[0])
         .then(function (x) { return x.json(); })
         .then(function (cards) {
@@ -240,6 +312,8 @@ function caricaMateriale() {
           cards.forEach(function (cd) {
             var cl = (cd.checklists || []).filter(function (k) { return k.name === CHECKLIST_MAT; })[0];
             if (cl) materiale[cd.id] = cl;
+            var dc = (cd.checklists || []).filter(function (k) { return k.name === CHECKLIST_DATE; })[0];
+            if (dc) dateComm[cd.id] = dc;
           });
         });
     });
