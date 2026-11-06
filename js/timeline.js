@@ -34,6 +34,10 @@ function fase(c) {
 }
 function oggi0() { var d = new Date(); d.setHours(0, 0, 0, 0); return d; }
 function giorno0(x) { var d = new Date(x); d.setHours(0, 0, 0, 0); return d; }
+// Giorni lavorativi di resa (trasporto) dopo la data del fornitore: stesso valore di GiorniResaFornitore
+// in collegamento-programma.json sul server (eccezioni per fornitore solo lato server/mail).
+var GIORNI_RESA = 2, GIORNI_PROD_STD = 14, GIORNI_PROD_MIN = 7;   // come collegamento-programma.json
+function conResa(d) { if (!d) return d; var r = new Date(d), n = 0; while (n < GIORNI_RESA) { r.setDate(r.getDate() + 1); if (r.getDay() % 6) n++; } return r; }
 function gm(d) { return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }); }
 function gma(d) { return d.toLocaleDateString('it-IT'); }
 
@@ -78,11 +82,34 @@ function calcolaMateriale(c) {
     if (motivo) { m.ritardo = true; m.inRitardo++; }
     if (arr && (!ultimo || arr > ultimo)) ultimo = arr;
     m.mancanti.push([parti[0] || it.name, parti[1] || '', (parti[2] || '').replace(/^arrivo.*/, ''),
-                     arr ? gma(arr) : 'non indicato', motivo, ordine]);
+                     arr ? gma(arr) : 'non indicato', motivo, ordine, arr]);
   });
   m.ultimoD = ultimo;
   m.ultimo = ultimo ? gm(ultimo) : '';
   return m;
+}
+
+// VINCOLI col Programma lavori (solo montaggi non ancora finiti; date fornitori fisse):
+//  pezzi senza data, in arrivo dopo l'inizio montaggio o gia' in ritardo; scadenza Trello dopo l'inizio montaggio.
+// Restituisce i pezzi in conflitto; .scad = scadenza Trello se cade dopo l'inizio montaggio; .n = numero problemi
+function conflitto(c, tp) {
+  var r = [];
+  if (!tp || !tp.montaggio || (tp.montaggioFine || tp.montaggio) < oggi0()) { r.n = 0; return r; }
+  var o = oggi0();
+  if (c.mat && c.mat.mancanti) r = c.mat.mancanti.filter(function (x) { var d = conResa(x[6]); return !d || d > tp.montaggio || d < o; });
+  // produzione: standard 14 g prima del montaggio, forzabile fino a 7 g (margine ridotto, lo organizza Massimo)
+  if (c.due && !c.dueComplete && tp.montaggio > o) {
+    var sc = giorno0(c.due), lim = new Date(tp.montaggio); lim.setDate(lim.getDate() - GIORNI_PROD_MIN); if (lim < o) lim = o;
+    var std = new Date(tp.montaggio); std.setDate(std.getDate() - GIORNI_PROD_STD);
+    if (sc > lim) r.scad = sc; else if (sc > std) r.ridotto = sc;
+  }
+  r.n = r.length + (r.scad ? 1 : 0);
+  return r;
+}
+function testoConflitto(cf, tp) {
+  if (cf.length && cf.scad) return 'montaggio ' + gm(tp.montaggio) + ': materiale e scadenza';
+  if (cf.scad) return 'scadenza ' + gm(cf.scad) + (cf.scad >= tp.montaggio ? ' dopo il' : ' troppo vicina al') + ' montaggio ' + gm(tp.montaggio);
+  return 'montaggio ' + gm(tp.montaggio) + ' prima del materiale';
 }
 
 function testoMateriale(m) {
@@ -99,12 +126,22 @@ function dettaglio(c) {
   h += '<p>Presa in carico <b>' + (c.start ? gma(new Date(c.start)) : 'non indicata') + '</b> &middot; scadenza <b>' + (c.due ? gma(new Date(c.due)) : 'non indicata') + '</b> &middot; ' + etichetta(c.g, c.dueComplete) + '</p>';
   var tp = tappe[c.id] ? tappeDi(c.id) : null;
   if (tp) h += '<p>' + TAPPE.map(function (x) { return x.nome + ' <b>' + (tp[x.k] ? gma(tp[x.k]) : '&ndash;') + '</b>'; }).join(' &middot; ') + '</p>';
+  var tq = tappeDi(c.id);
+  if (tq.montaggio) h += '<p>Programma lavori: montaggio <b>' + gma(tq.montaggio) + ' &ndash; ' + gma(tq.montaggioFine) + '</b>' + (tq.montatori ? ' (' + esc(tq.montatori) + ')' : '') +
+    (tq.montaggioNota ? ' <i>' + esc(tq.montaggioNota) + '</i>' : '') + (tq.prodEntro ? ' &middot; produzione entro <b>' + gma(tq.prodEntro) + '</b>' : '') + '</p>';
+  var cf = conflitto(c, tq);
+  if (cf.length) h += '<p class="conf">&#9888; Il montaggio (dal ' + gma(tq.montaggio) + ') non &egrave; compatibile con ' + cf.length + ' pezz' + (cf.length > 1 ? 'i' : 'o') + ': senza data, in arrivo dopo l\'inizio montaggio o gi&agrave; in ritardo (righe evidenziate sotto). Le date dei fornitori non si spostano: rivedere il programma o sollecitare.</p>';
+  if (cf.scad) h += '<p class="conf">&#9888; La scadenza Trello (' + gma(cf.scad) + ') lascia meno di ' + GIORNI_PROD_MIN + ' giorni prima del montaggio (' + gma(tq.montaggio) + '): anticipare la scadenza o rivedere il programma.</p>';
+  else if (cf.ridotto) h += '<p>Margine ridotto: produzione ' + gma(cf.ridotto) + ', montaggio ' + gma(tq.montaggio) + ' (' + Math.round((tq.montaggio - cf.ridotto) / 864e5) + ' g invece di ' + GIORNI_PROD_STD + ', da organizzare con Massimo).</p>';
   if (m === undefined) return h + '<p>Autorizza la lettura del materiale (pulsante in alto) per vedere il dettaglio.</p>';
   if (!m) return h + '<p>Nessuna checklist "' + CHECKLIST_MAT + '" su questa scheda.</p>';
   if (!m.mancanti.length) return h + '<p>Tutto il materiale (' + m.totale + ' pezzi) risulta a magazzino.</p>';
   h += '<p>Materiale arrivato <b>' + m.arrivati + ' su ' + m.totale + '</b></p><table><tr><th>Pezzo</th><th>Fornitore</th><th>Stato</th><th>Arrivo</th><th></th><th>Ordine</th></tr>';
   m.mancanti.forEach(function (x) {
-    h += '<tr' + (x[4] ? ' class="rit"' : '') + '><td>' + esc(x[0]) + '</td><td>' + esc(x[1]) + '</td><td>' + x[2] + '</td><td>' + x[3] + '</td><td>' + (x[4] || '') + '</td><td>' + esc(x[5]) + '</td></tr>';
+    var inConf = cf.indexOf(x) >= 0, dopo = inConf && (!x[6] || conResa(x[6]) > tq.montaggio);
+    var mot = x[4] || (inConf ? (dopo ? 'dopo l\'inizio montaggio' : 'in ritardo') : '');
+    if (dopo && x[4]) mot += ', dopo l\'inizio montaggio';
+    h += '<tr' + (mot ? ' class="rit"' : '') + '><td>' + esc(x[0]) + '</td><td>' + esc(x[1]) + '</td><td>' + x[2] + '</td><td>' + x[3] + '</td><td>' + mot + '</td><td>' + esc(x[5]) + '</td></tr>';
   });
   return h + '</table>';
 }
@@ -117,6 +154,7 @@ var TAPPE = [
   { k: 'rilievo', lettera: 'R', nome: 'Rilievo' },
   { k: 'progetto', lettera: 'P', nome: 'Progetto' },
   { k: 'finiture', lettera: 'F', nome: 'Finiture' },
+  { k: 'montaggio', lettera: 'M', nome: 'Montaggio' },
   { k: 'produzione', lettera: '&#9654;', nome: 'In produzione' }
 ];
 var tappe = {}, tokenApi = null, caricoTappe = false;
@@ -147,6 +185,11 @@ function tappeDi(id) {
   if (dc) dc.checkItems.forEach(function (it) {
     var m = /^Finiture\s+(\d{2}\/\d{2}\/\d{4})/.exec(it.name);
     if (m) r.finiture = parseData(m[1]);
+    // "Montaggio gg/mm/aaaa - gg/mm/aaaa (Montatore)" e "Produzione entro gg/mm/aaaa" (dal Programma lavori)
+    var mo = /^Montaggio\s+(\d{2}\/\d{2}\/\d{4})\D+(\d{2}\/\d{2}\/\d{4})\s*(\(([^)]*)\))?(.*)$/.exec(it.name);
+    if (mo) { r.montaggio = parseData(mo[1]); r.montaggioFine = parseData(mo[2]); r.montatori = mo[4] || ''; r.montaggioNota = (mo[5] || '').replace(/^\s*-\s*/, ''); }
+    var pe = /^Produzione entro\s+(\d{2}\/\d{2}\/\d{4})/.exec(it.name);
+    if (pe) r.prodEntro = parseData(pe[1]);
   });
   return r;
 }
@@ -197,6 +240,8 @@ function disegna() {
     var a = c.s && c.s < c.d ? c.s : c.d;
     if (a < min) min = a;
     if (c.d > max) max = c.d;
+    var tm = tappeDi(c.id);
+    if (tm.montaggioFine && tm.montaggioFine > max) max = tm.montaggioFine;
   });
   min = new Date(min.getTime() - 7 * GIORNO);
   max = new Date(max.getTime() + 14 * GIORNO);
@@ -238,12 +283,13 @@ function disegna() {
     var dcf = dateComm[c.id] ? dateComm[c.id].checkItems.filter(function (x) { return x.state === 'complete'; }).length : 0;
     var tot = (b.checkItems || 0) - (c.mat ? c.mat.voci : 0) - dcn, fatti = (b.checkItemsChecked || 0) - (c.mat ? c.mat.vociFatte : 0) - dcf;
     var ck = tot > 0 ? ' &middot; <span class="ck">&#9745; ' + fatti + '/' + tot + '</span>' : '';
-    var alert = c.mat && c.mat.ritardo ? ' alert' : '';
+    var tpc = tappeDi(c.id), cfl = conflitto(c, tpc);
+    var alert = (c.mat && c.mat.ritardo) || cfl.n ? ' alert' : '';
 
     // etichetta a sinistra
     html += '<div class="lab' + (i % 2 ? ' dispari' : '') + alert + '" data-id="' + c.id + '" style="top:' + y + 'px;height:' + ROW_H + 'px" title="' + esc(c.name) + '">' +
       '<b>' + esc(c.name) + '</b><span class="sub">' + (listaSel === TUTTE ? '<span class="fase">' + esc(fase(c)) + '</span> ' : '') + (c.s ? gm(c.s) : '--/--') + ' &rarr; ' + gm(c.d) + ' &middot; <b class="eti ' + colore(c.g, c.dueComplete) + '">' + etichetta(c.g, c.dueComplete) + '</b></span>' +
-      '<span class="sub">' + testoMateriale(c.mat) + ck + '</span></div>';
+      '<span class="sub">' + (cfl.n ? '<span class="mat mat-ko">&#9888; ' + testoConflitto(cfl, tpc) + '</span>' : testoMateriale(c.mat) + ck) + '</span></div>';
 
     // barra: presa in carico -> scadenza
     var x1 = c.s ? xD(c.s) : xD(c.d) - 40, x2 = xD(c.d);
@@ -271,6 +317,11 @@ function disegna() {
         ultimaX = xm;
         html += '<div class="tappa ' + m.k + '" data-id="' + c.id + '" title="' + m.nome + ' ' + gma(tp[m.k]) + '" style="left:' + xm + 'px;top:' + (yb - 11) + 'px">' + m.lettera + '</div>';
       });
+    // fascia del montaggio (dal Programma lavori), sotto la barra
+    if (tpc.montaggio) {
+      var xa = xD(tpc.montaggio), xb = xD(tpc.montaggioFine || tpc.montaggio) + pxG;
+      html += '<div class="mont' + (cfl.n ? ' conf' : '') + '" data-id="' + c.id + '" title="Montaggio ' + gma(tpc.montaggio) + ' - ' + gma(tpc.montaggioFine || tpc.montaggio) + (tpc.montatori ? ' (' + esc(tpc.montatori) + ')' : '') + '" style="left:' + xa + 'px;top:' + (yb + 24) + 'px;width:' + Math.max(xb - xa, 4) + 'px"></div>';
+    }
     // segno della scadenza
     html += '<div class="scad" style="left:' + (x2 - 1) + 'px;top:' + (yb - 4) + 'px"></div>';
     // arrivo dell'ultimo pezzo atteso
