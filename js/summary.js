@@ -72,7 +72,8 @@ t.render(function () {
     t.cards('id', 'name', 'due', 'dueComplete', 'idList', 'badges'),
     t.lists('id', 'name'),
     leggiSoglie(t),
-    leggiListeEscluse(t)
+    leggiListeEscluse(t),
+    leggiChiusure(t)
   ]).then(function (r) {
     var liste = {};
     r[1].forEach(function (l) { liste[l.id] = l; });

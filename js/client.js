@@ -1,11 +1,12 @@
-/* global TrelloPowerUp, leggiSoglie, leggiListeEscluse, listaEsclusa, statoScadenza, formattaData, ICON_URL */
+/* global TrelloPowerUp, leggiChiusure, leggiSoglie, leggiListeEscluse, listaEsclusa, statoScadenza, formattaData, ICON_URL */
 
 function badgeScadenza(t, dettaglio) {
   return Promise.all([
     t.card('due', 'dueComplete'),
     t.list('id', 'name'),
     leggiSoglie(t),
-    leggiListeEscluse(t)
+    leggiListeEscluse(t),
+    leggiChiusure(t)
   ]).then(function (r) {
     var card = r[0], lista = r[1], soglie = r[2], escluse = r[3];
     if (listaEsclusa(lista, escluse)) return [];   // es. TERMINATI: nessun badge
@@ -79,7 +80,7 @@ TrelloPowerUp.initialize({
     return t.popup({
       title: 'Impostazioni scadenze',
       url: './settings.html',
-      height: 480
+      height: 620
     });
   }
 }, {

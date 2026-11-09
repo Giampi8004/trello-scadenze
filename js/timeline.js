@@ -1,6 +1,6 @@
 /* Deadline: una commessa per riga, barra dalla presa in carico (data di inizio) alla scadenza.
    Passato a sinistra, futuro a destra, linea verticale = oggi.
-   In ritardo: la barra prosegue oltre la scadenza fino a oggi (rosso fino a 10 g, viola oltre).
+   In ritardo: la barra prosegue oltre la scadenza fino a oggi (rosso fino a 10 g lavorativi, viola oltre).
    Materiale dalla checklist "Materiale fornitori" (aggiornata dal server da Ready Web). */
 var APP_KEY = 'f5089339fa1b492c9a45601594a6982c';
 var CHECKLIST_MAT = 'Materiale fornitori';
@@ -37,7 +37,7 @@ function giorno0(x) { var d = new Date(x); d.setHours(0, 0, 0, 0); return d; }
 // Giorni lavorativi di resa (trasporto) dopo la data del fornitore: stesso valore di GiorniResaFornitore
 // in collegamento-programma.json sul server (eccezioni per fornitore solo lato server/mail).
 var GIORNI_RESA = 2, GIORNI_PROD_STD = 14, GIORNI_PROD_MIN = 7;   // come collegamento-programma.json
-function conResa(d) { if (!d) return d; var r = new Date(d), n = 0; while (n < GIORNI_RESA) { r.setDate(r.getDate() + 1); if (r.getDay() % 6) n++; } return r; }
+function conResa(d) { if (!d) return d; var r = new Date(d), n = 0; while (n < GIORNI_RESA) { r.setDate(r.getDate() + 1); if (!nonLavorativo(r)) n++; } return r; }
 function gm(d) { return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }); }
 function gma(d) { return d.toLocaleDateString('it-IT'); }
 
@@ -49,11 +49,12 @@ function colore(g, completa) {
   return 'verde';
 }
 
-function etichetta(g, completa) {
+// g = giorni LAVORATIVI (sabato, domenica, festivita' e chiusure aziendali esclusi)
+function etichetta(g, completa, due) {
   if (completa) return 'Completata';
-  if (g === 0) return 'Scade oggi';
-  if (g < 0) return 'In ritardo di ' + (-g) + ' g';
-  return 'Mancano ' + g + ' g';
+  if (g === 0) return (due && giorniMancanti(due) > 0) ? 'Scade ' + gm(giorno0(due)) : 'Scade oggi';
+  if (g < 0) return 'In ritardo di ' + (-g) + ' g lav.';
+  return 'Mancano ' + g + ' g lav.';
 }
 
 function parseData(s) {
@@ -123,7 +124,7 @@ function testoMateriale(m) {
 
 function dettaglio(c) {
   var m = c.mat, h = '<h4>' + esc(c.name) + ' <button class="apri" data-apri="' + c.id + '">Apri scheda</button></h4>';
-  h += '<p>Presa in carico <b>' + (c.start ? gma(new Date(c.start)) : 'non indicata') + '</b> &middot; scadenza <b>' + (c.due ? gma(new Date(c.due)) : 'non indicata') + '</b> &middot; ' + etichetta(c.g, c.dueComplete) + '</p>';
+  h += '<p>Presa in carico <b>' + (c.start ? gma(new Date(c.start)) : 'non indicata') + '</b> &middot; scadenza <b>' + (c.due ? gma(new Date(c.due)) : 'non indicata') + '</b> &middot; ' + etichetta(c.g, c.dueComplete, c.due) + '</p>';
   var tp = tappe[c.id] ? tappeDi(c.id) : null;
   if (tp) h += '<p>' + TAPPE.map(function (x) { return x.nome + ' <b>' + (tp[x.k] ? gma(tp[x.k]) : '&ndash;') + '</b>'; }).join(' &middot; ') + '</p>';
   var tq = tappeDi(c.id);
@@ -215,7 +216,7 @@ function disegna() {
     : carte.filter(function (c) { return c.idList === listaSel; });
   var conData = sel.filter(function (c) { return c.due; })
     .map(function (c) {
-      c.g = giorniMancanti(c.due); c.mat = calcolaMateriale(c);
+      c.g = giorniLavorativi(c.due); c.mat = calcolaMateriale(c);
       c.d = giorno0(c.due); c.s = c.start ? giorno0(c.start) : null;
       return c;
     })
@@ -288,7 +289,7 @@ function disegna() {
 
     // etichetta a sinistra
     html += '<div class="lab' + (i % 2 ? ' dispari' : '') + alert + '" data-id="' + c.id + '" style="top:' + y + 'px;height:' + ROW_H + 'px" title="' + esc(c.name) + '">' +
-      '<b>' + esc(c.name) + '</b><span class="sub">' + (listaSel === TUTTE ? '<span class="fase">' + esc(fase(c)) + '</span> ' : '') + (c.s ? gm(c.s) : '--/--') + ' &rarr; ' + gm(c.d) + ' &middot; <b class="eti ' + colore(c.g, c.dueComplete) + '">' + etichetta(c.g, c.dueComplete) + '</b></span>' +
+      '<b>' + esc(c.name) + '</b><span class="sub">' + (listaSel === TUTTE ? '<span class="fase">' + esc(fase(c)) + '</span> ' : '') + (c.s ? gm(c.s) : '--/--') + ' &rarr; ' + gm(c.d) + ' &middot; <b class="eti ' + colore(c.g, c.dueComplete) + '">' + etichetta(c.g, c.dueComplete, c.due) + '</b></span>' +
       '<span class="sub">' + (cfl.n ? '<span class="mat mat-ko">&#9888; ' + testoConflitto(cfl, tpc) + '</span>' : testoMateriale(c.mat) + ck) + '</span></div>';
 
     // barra: presa in carico -> scadenza
@@ -304,8 +305,8 @@ function disegna() {
     if (ritardo) {
       var wc = Math.max(xD(oggi) - x2, 3);
       html += '<div class="coda ' + col + '" data-id="' + c.id + '" style="left:' + x2 + 'px;top:' + yb + 'px;width:' + wc + 'px">' +
-        (wc >= 48 ? '<span>+' + (-c.g) + ' g</span>' : '') + '</div>';
-      if (wc < 48) html += '<div class="fuori rit" style="left:' + (x2 + wc + 6) + 'px;top:' + yb + 'px">+' + (-c.g) + ' g</div>';
+        (wc >= 48 ? '<span>+' + (-c.g) + ' g lav.</span>' : '') + '</div>';
+      if (wc < 48) html += '<div class="fuori rit" style="left:' + (x2 + wc + 6) + 'px;top:' + yb + 'px">+' + (-c.g) + ' g lav.</div>';
     }
     // milestone (rilievo, progetto, ingresso in produzione)
     // sopra la barra, appoggiate al bordo; se troppo vicine si affiancano (la data esatta e' nel tooltip)
@@ -404,7 +405,8 @@ t.render(function () {
     t.cards('id', 'name', 'start', 'due', 'dueComplete', 'idList', 'badges'),
     t.lists('id', 'name'),
     t.get('board', 'private', 'listaTimeline', null),
-    leggiListeEscluse(t)
+    leggiListeEscluse(t),
+    leggiChiusure(t)
   ]).then(function (r) {
     carte = r[0]; liste = r[1]; escluse = r[3];
     var salvata = (r[2] === TUTTE || liste.some(function (l) { return l.id === r[2]; })) ? r[2] : null;
