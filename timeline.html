@@ -74,12 +74,18 @@
     #det tr.rit td { color: #ae2e24; font-weight: 600; }
     #auth { margin: 0 0 10px; padding: 8px 12px; background: #e9f2ff; border-radius: 6px; font-size: 13px; }
     #auth button, .apri { margin: 0 0 0 8px; padding: 2px 10px; font-size: 12px; }
+    .zoom { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #44546f; }
+    .zoom button { margin: 0; padding: 2px 9px; font-weight: 700; }
+    .zoom #zval { min-width: 38px; text-align: center; font-variant-numeric: tabular-nums; }
     .vuoto { padding: 40px; text-align: center; color: #5e6c84; }
   </style>
 </head>
 <body>
   <div class="top">
     <label>Lista <select id="lista"></select></label>
+    <span class="zoom" title="Dimensione">
+      <button type="button" id="zmeno" aria-label="Rimpicciolisci">A&minus;</button><span id="zval">125%</span><button type="button" id="zpiu" aria-label="Ingrandisci">A+</button>
+    </span>
     <div class="leg">
       <span><i style="background:#4bce97"></i>Oltre 10 giorni lavorativi</span>
       <span><i style="background:#f5cd47"></i>Entro 10 giorni lavorativi</span>
@@ -99,7 +105,7 @@
   <div id="det"><i>Clicca una commessa per vedere il dettaglio del materiale.</i></div>
   <div class="nodata" id="nodata"></div>
 
-  <script src="./js/common.js?v=11"></script>
-  <script src="./js/timeline.js?v=11"></script>
+  <script src="./js/common.js?v=12"></script>
+  <script src="./js/timeline.js?v=12"></script>
 </body>
 </html>
