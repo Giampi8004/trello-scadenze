@@ -18,11 +18,15 @@
 <body>
   <form id="f">
     <h4>Soglie colori</h4>
-    <label for="rosso">Rosso entro (giorni)</label>
+    <label for="rosso">Rosso entro (giorni lavorativi)</label>
     <input id="rosso" type="number" min="0" max="365" required>
-    <label for="giallo">Giallo entro (giorni)</label>
+    <label for="giallo">Giallo entro (giorni lavorativi)</label>
     <input id="giallo" type="number" min="0" max="365" required>
     <p class="hint">Oltre la soglia gialla il badge è verde. Le scadenze passate sono sempre rosse.</p>
+
+    <h4>Chiusure aziendali</h4>
+    <p class="hint">Giorni lavorativi = esclusi sabato, domenica, festività nazionali e Pasquetta (già incluse) e le chiusure qui sotto. Una per riga: <b>24/12/2026</b> oppure <b>27/12/2026 - 31/12/2026</b>.</p>
+    <textarea id="chiusure" rows="5" style="width:100%;font-family:inherit"></textarea>
 
     <h4>Liste finali</h4>
     <p class="hint">Le schede in queste liste non hanno badge e non compaiono tra scadute o senza data.</p>
@@ -32,7 +36,7 @@
     <button type="submit" class="mod-primary">Salva</button>
   </form>
 
-  <script src="./js/common.js"></script>
+  <script src="./js/common.js?v=6"></script>
   <script>
     var t = TrelloPowerUp.iframe();
     var rosso = document.getElementById('rosso');
@@ -46,7 +50,8 @@
     }
 
     t.render(function () {
-      return Promise.all([leggiSoglie(t), leggiListeEscluse(t), t.lists('id', 'name')]).then(function (r) {
+      return Promise.all([leggiSoglie(t), leggiListeEscluse(t), t.lists('id', 'name'), leggiChiusure(t)]).then(function (r) {
+        document.getElementById('chiusure').value = testoChiusure(r[3]);
         rosso.value = r[0].rosso;
         giallo.value = r[0].giallo;
         boxListe.innerHTML = r[2].map(function (l) {
@@ -64,9 +69,14 @@
         document.getElementById('err').textContent = 'La soglia gialla deve essere ≥ di quella rossa.';
         return;
       }
+      var pc = parseChiusure(document.getElementById('chiusure').value);
+      if (pc.errori.length) {
+        document.getElementById('err').textContent = 'Date non valide: ' + pc.errori.join(', ') + ' (formato gg/mm/aaaa).';
+        return;
+      }
       var escluse = Array.prototype.map.call(
         boxListe.querySelectorAll('input:checked'), function (i) { return i.value; });
-      t.set('board', 'shared', { soglie: { rosso: r, giallo: g }, listeEscluse: escluse }).then(function () {
+      t.set('board', 'shared', { soglie: { rosso: r, giallo: g }, listeEscluse: escluse, chiusure: pc.chiusure }).then(function () {
         t.closePopup();
       });
     });
