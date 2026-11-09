@@ -400,6 +400,19 @@ document.getElementById('lista').addEventListener('change', function () {
 
 window.addEventListener('resize', function () { if (carte.length) disegna(); });
 
+// Dimensione della Deadline (A- / A+), ricordata per ogni utente. Default 125%.
+var ZOOM_MIN = 1, ZOOM_MAX = 2, ZOOM_STEP = 0.125, zoom = 1.25;
+function applicaZoom(z, salva) {
+  zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z / ZOOM_STEP) * ZOOM_STEP));
+  document.body.style.zoom = zoom;
+  document.getElementById('zval').textContent = Math.round(zoom * 100) + '%';
+  if (salva) t.set('member', 'private', 'zoomDeadline', zoom);
+  if (carte.length) disegna();
+}
+document.getElementById('zmeno').addEventListener('click', function () { applicaZoom(zoom - ZOOM_STEP, true); });
+document.getElementById('zpiu').addEventListener('click', function () { applicaZoom(zoom + ZOOM_STEP, true); });
+t.get('member', 'private', 'zoomDeadline', 1.25).then(function (z) { applicaZoom(Number(z) || 1.25, false); }, function () { applicaZoom(1.25, false); });
+
 t.render(function () {
   return Promise.all([
     t.cards('id', 'name', 'start', 'due', 'dueComplete', 'idList', 'badges'),
